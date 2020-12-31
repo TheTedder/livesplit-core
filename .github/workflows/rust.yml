@@ -471,6 +471,8 @@ jobs:
             target: aarch64-apple-darwin
             os: macOS-latest
             cross: skip
+            tests: skip
+            install_target: true
 
           # - label: macOS i686
           #   target: i686-apple-darwin
