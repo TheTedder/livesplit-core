@@ -83,6 +83,7 @@ jobs:
           # - Linux sparc64
 
           # macOS
+          - macOS aarch64
           # 32-bit macOS is deprecated and doesn't build:
           # https://github.com/CryZe/livesplit-core/runs/220089673
           # - macOS i686
@@ -466,6 +467,11 @@ jobs:
           #   tests: skip
 
           # macOS
+          - label: macOS aarch64
+            toolchain: stable-aarch64-apple-darwin
+            os: macOS-latest
+            cross: skip
+
           # - label: macOS i686
           #   target: i686-apple-darwin
           #   toolchain: stable-i686-apple-darwin
