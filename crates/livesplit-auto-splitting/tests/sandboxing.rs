@@ -1,5 +1,5 @@
 use bstr::BStr;
-use livesplit_auto_splitting::Runtime;
+use livesplit_auto_splitting::{Runtime, Timer};
 use log::Log;
 use std::{
     cell::RefCell,
@@ -35,7 +35,15 @@ impl Log for Logger {
     fn flush(&self) {}
 }
 
-fn compile(crate_name: &str) -> anyhow::Result<Runtime> {
+struct DummyTimer;
+
+impl Timer for DummyTimer {
+    fn start(&mut self) {}
+    fn split(&mut self) {}
+    fn reset(&mut self) {}
+}
+
+fn compile(crate_name: &str) -> anyhow::Result<Runtime<DummyTimer>> {
     let mut path = PathBuf::from("tests");
     path.push("test-cases");
     path.push(crate_name);
@@ -70,7 +78,7 @@ fn compile(crate_name: &str) -> anyhow::Result<Runtime> {
         })
         .unwrap();
 
-    Runtime::new(&fs::read(wasm_path).unwrap())
+    Runtime::new(&fs::read(wasm_path).unwrap(), DummyTimer)
 }
 
 fn run(crate_name: &str) -> anyhow::Result<()> {
