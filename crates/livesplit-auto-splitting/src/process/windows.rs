@@ -18,9 +18,9 @@ use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
-use std::{iter, mem, ptr, result, slice};
+use std::{mem, ptr};
 
-use super::{Address, Error, Offset, ProcessImpl, Result, ScannableRange, Signature};
+use super::{Address, Error, ProcessImpl, Result, ScannableRange};
 
 #[derive(Debug)]
 pub struct Process {
