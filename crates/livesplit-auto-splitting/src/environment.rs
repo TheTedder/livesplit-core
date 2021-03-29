@@ -173,6 +173,12 @@ impl<T: Timer> Environment<T> {
         Ok(())
     }
 
+    pub fn set_game_time(&mut self, secs: i64, nanos: i64) -> Result<(), Trap> {
+        self.timer
+            .set_game_time(Duration::new(secs as u64, nanos as u32));
+        Ok(())
+    }
+
     // pub fn update_values(&mut self, just_connected: bool) -> anyhow::Result<()> {
     //     let process = self
     //         .process
