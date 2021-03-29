@@ -102,54 +102,6 @@ impl<T: Timer> Environment<T> {
         Ok(())
     }
 
-    // pub fn push_pointer_path(
-    //     &mut self,
-    //     ptr: i32,
-    //     len: i32,
-    //     pointer_type: i32,
-    // ) -> Result<i32, Trap> {
-    //     let pointer_type = PointerType::from_u32(pointer_type as u32)
-    //         .ok_or_else(|| Trap::new("Invalid pointer type"))
-    //         .unwrap();
-
-    //     let current = match pointer_type {
-    //         PointerType::U8 => PointerValue::U8(0),
-    //         PointerType::U16 => PointerValue::U16(0),
-    //         PointerType::U32 => PointerValue::U32(0),
-    //         PointerType::U64 => PointerValue::U64(0),
-    //         PointerType::I8 => PointerValue::I8(0),
-    //         PointerType::I16 => PointerValue::I16(0),
-    //         PointerType::I32 => PointerValue::I32(0),
-    //         PointerType::I64 => PointerValue::I64(0),
-    //         PointerType::F32 => PointerValue::F32(0.0),
-    //         PointerType::F64 => PointerValue::F64(0.0),
-    //         PointerType::String => PointerValue::String(String::new()),
-    //     };
-
-    //     let module_name = read_str(&mut self.memory, ptr, len)?.to_owned();
-
-    //     let id = self.pointer_paths.len();
-
-    //     self.pointer_paths.push(PointerPath {
-    //         module_name,
-    //         offsets: Vec::new(),
-    //         old: current.clone(),
-    //         current,
-    //     });
-
-    //     Ok(id as _)
-    // }
-
-    // pub fn push_offset(&mut self, pointer_path_id: i32, offset: i64) -> Result<(), Trap> {
-    //     self.pointer_paths
-    //         .get_mut(pointer_path_id as u32 as usize)
-    //         .ok_or_else(|| Trap::new("Specified invalid pointer path"))?
-    //         .offsets
-    //         .push(offset);
-
-    //     Ok(())
-    // }
-
     // pub fn get_val<T>(
     //     &self,
     //     pointer_path_id: i32,
