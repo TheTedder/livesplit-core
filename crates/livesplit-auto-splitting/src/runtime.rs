@@ -1,12 +1,10 @@
 use crate::{
     environment::Environment,
-    pointer::PointerValue,
-    process::Process,
     std_stream::{stderr, stdout},
     timer::Timer,
     InterruptHandle,
 };
-use std::{cell::RefCell, mem, rc::Rc, thread, time::Duration};
+use std::{cell::RefCell, mem, rc::Rc};
 use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
 use wasmtime_wasi::Wasi;
@@ -212,11 +210,6 @@ impl<T: Timer> Runtime<T> {
         //     move |ptr, len| env.borrow_mut().scan_signature(ptr, len)
         // })?;
 
-        linker.func("env", "set_tick_rate", {
-            let env = env.clone();
-            move |ticks_per_sec| env.borrow_mut().set_tick_rate(ticks_per_sec)
-        })?;
-
         linker.func("env", "print_message", {
             let env = env.clone();
             move |ptr, len| env.borrow_mut().print_message(ptr, len)
@@ -261,19 +254,6 @@ impl<T: Timer> Runtime<T> {
             .store()
             .interrupt_handle()
             .expect("We configured the runtime to produce an interrupt handle")
-    }
-
-    pub fn sleep(&self) {
-        let env = self.env.borrow();
-        let duration = // if env.process.is_some() {
-            env.tick_rate;
-        // } else {
-        //     Duration::from_secs(1)
-        // };
-
-        // FIXME: What if this is insanely long?
-        // FIXME: We may neeed to consider that running the update itself takes time.
-        thread::sleep(duration);
     }
 
     pub fn step(&mut self) -> anyhow::Result<()> {
