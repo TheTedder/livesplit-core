@@ -47,13 +47,20 @@ pub(crate) struct ScannableIter {
 impl Iterator for ScannableIter {
     type Item = ScannableRange;
     fn next(&mut self) -> Option<Self::Item> {
-        const mbi_size: usize = mem::size_of::<MEMORY_BASIC_INFORMATION>();
+        const MBI_SIZE: usize = mem::size_of::<MEMORY_BASIC_INFORMATION>();
         while self.addr < self.max {
             unsafe {
-                let mut mbi: MEMORY_BASIC_INFORMATION = mem::uninitialized();
-                if VirtualQueryEx(self.handle, self.addr as _, &mut mbi, mbi_size) == 0 {
+                let mut mbi_uninit = mem::MaybeUninit::uninit();
+                if VirtualQueryEx(
+                    self.handle,
+                    self.addr as _,
+                    mbi_uninit.as_mut_ptr(),
+                    MBI_SIZE,
+                ) < MBI_SIZE
+                {
                     break;
                 }
+                let mbi = mbi_uninit.assume_init();
                 self.addr += mbi.RegionSize as u64;
 
                 // We don't care about reserved / free pages
@@ -94,16 +101,17 @@ impl ProcessImpl for Process {
                 return Err(Error::ListProcesses);
             }
 
-            let mut creation_time = mem::uninitialized();
-            let mut exit_time = mem::uninitialized();
-            let mut kernel_time = mem::uninitialized();
-            let mut user_time = mem::uninitialized();
+            let mut creation_time_unitit = mem::MaybeUninit::uninit();
+            let mut exit_time_uninit = mem::MaybeUninit::uninit();
+            let mut kernel_time_uninit = mem::MaybeUninit::uninit();
+            let mut user_time_uninit = mem::MaybeUninit::uninit();
 
             let mut best_process = None::<(DWORD, u64)>;
-            let mut entry: PROCESSENTRY32W = mem::uninitialized();
-            entry.dwSize = mem::size_of_val(&entry) as _;
+            let mut entry_uninit = mem::MaybeUninit::<PROCESSENTRY32W>::uninit();
+            (*entry_uninit.as_mut_ptr()).dwSize = mem::size_of::<PROCESSENTRY32W>() as _;
 
-            if Process32FirstW(snapshot, &mut entry) != 0 {
+            if Process32FirstW(snapshot, entry_uninit.as_mut_ptr()) != 0 {
+                let mut entry = entry_uninit.assume_init();
                 loop {
                     {
                         let entry_name = &entry.szExeFile;
@@ -117,12 +125,13 @@ impl ProcessImpl for Process {
                             if !process.is_null() {
                                 let success = GetProcessTimes(
                                     process,
-                                    &mut creation_time,
-                                    &mut exit_time,
-                                    &mut kernel_time,
-                                    &mut user_time,
+                                    creation_time_unitit.as_mut_ptr(),
+                                    exit_time_uninit.as_mut_ptr(),
+                                    kernel_time_uninit.as_mut_ptr(),
+                                    user_time_uninit.as_mut_ptr(),
                                 );
                                 if success != 0 {
+                                    let creation_time = creation_time_unitit.assume_init();
                                     let time = (creation_time.dwHighDateTime as u64) << 32
                                         | (creation_time.dwLowDateTime as u64);
 
@@ -218,10 +227,11 @@ impl Process {
 
                 // TODO: processes can dynamically load and unload processes...
                 let mut modules = HashMap::new();
-                let mut entry: MODULEENTRY32W = mem::uninitialized();
-                entry.dwSize = mem::size_of_val(&entry) as _;
+                let mut entry_uninit = mem::MaybeUninit::<MODULEENTRY32W>::uninit();
+                (*entry_uninit.as_mut_ptr()).dwSize = mem::size_of::<MODULEENTRY32W>() as _;
 
-                if Module32FirstW(snapshot, &mut entry) != 0 {
+                if Module32FirstW(snapshot, entry_uninit.as_mut_ptr()) != 0 {
+                    let mut entry = entry_uninit.assume_init();
                     loop {
                         {
                             let base_address = entry.modBaseAddr as Address;
