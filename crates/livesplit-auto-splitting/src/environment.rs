@@ -85,7 +85,6 @@ impl<T: Timer> Environment<T> {
     pub fn attach(&mut self, ptr: i32, len: i32) -> Result<i64, Trap> {
         let process_name = read_str(&mut self.memory, ptr, len)?;
         let key = if let Ok(p) = Process::with_name(process_name) {
-            let id = self.processes.len();
             self.processes.insert(p)
         } else {
             ProcessKey::null()
@@ -96,8 +95,7 @@ impl<T: Timer> Environment<T> {
     pub fn detach(&mut self, process: i64) -> Result<(), Trap> {
         let key = ProcessKey::from(KeyData::from_ffi(process as u64));
 
-        let process = self
-            .processes
+        self.processes
             .remove(key)
             .ok_or_else(|| Trap::new(format!("Invalid process handle {}.", process)))?;
 
