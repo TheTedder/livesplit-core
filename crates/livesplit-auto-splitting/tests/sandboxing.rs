@@ -41,6 +41,7 @@ impl Timer for DummyTimer {
     fn start(&mut self) {}
     fn split(&mut self) {}
     fn reset(&mut self) {}
+    fn set_game_time(&mut self, _time: Duration) {}
 }
 
 fn compile(crate_name: &str) -> anyhow::Result<Runtime<DummyTimer>> {

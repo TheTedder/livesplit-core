@@ -35,7 +35,6 @@ pub struct Runtime<T> {
     timer_state: TimerState,
     update: Option<TypedFunc<(), ()>>,
     is_loading_val: Option<bool>,
-    game_time_val: Option<f64>,
 }
 
 impl<T: Timer> Runtime<T> {
@@ -98,6 +97,11 @@ impl<T: Timer> Runtime<T> {
             }
         })?;
 
+        linker.func("env", "set_game_time", {
+            let env = env.clone();
+            move |secs, nanos| env.borrow_mut().set_game_time(secs, nanos)
+        })?;
+
         let wasi_ctx = WasiCtxBuilder::new()
             .stdout(Box::new(stdout()))
             .stderr(Box::new(stderr()))
@@ -120,7 +124,6 @@ impl<T: Timer> Runtime<T> {
             timer_state: TimerState::NotRunning,
             update,
             is_loading_val: None,
-            game_time_val: None,
         })
     }
 
@@ -229,10 +232,6 @@ impl<T: Timer> Runtime<T> {
 
     pub fn is_loading(&self) -> Option<bool> {
         self.is_loading_val
-    }
-
-    pub fn game_time(&self) -> Option<f64> {
-        self.game_time_val
     }
 
     pub fn drain_variable_changes(&mut self) -> impl Iterator<Item = (String, String)> {
