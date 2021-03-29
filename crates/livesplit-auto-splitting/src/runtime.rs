@@ -80,21 +80,6 @@ impl<T: Timer> Runtime<T> {
             }
         })?;
 
-        // linker.func("env", "set_process_name", {
-        //     let env = env.clone();
-        //     move |ptr, len| env.borrow_mut().set_process_name(ptr, len)
-        // })?;
-
-        // linker.func("env", "push_pointer_path", {
-        //     let env = env.clone();
-        //     move |ptr, len, pointer_type| env.borrow_mut().push_pointer_path(ptr, len, pointer_type)
-        // })?;
-
-        // linker.func("env", "push_offset", {
-        //     let env = env.clone();
-        //     move |pointer_path_id, offset| env.borrow_mut().push_offset(pointer_path_id, offset)
-        // })?;
-
         // linker.func("env", "scan_signature", {
         //     let env = env.clone();
         //     move |ptr, len| env.borrow_mut().scan_signature(ptr, len)
