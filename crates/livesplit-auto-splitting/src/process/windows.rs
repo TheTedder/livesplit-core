@@ -14,10 +14,10 @@ use winapi::um::{
     },
 };
 
-use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
+use std::{collections::HashMap, mem::MaybeUninit};
 use std::{mem, ptr};
 
 use super::{Address, Error, ProcessImpl, Result, ScannableRange};
@@ -170,17 +170,18 @@ impl ProcessImpl for Process {
 
     fn read_buf(&self, address: Address, buf: &mut [u8]) -> Result<()> {
         unsafe {
-            let mut bytes_read = mem::uninitialized();
+            let mut bytes_read_uninit = mem::MaybeUninit::uninit();
 
             let successful = ReadProcessMemory(
                 self.handle,
                 address as _,
                 buf.as_mut_ptr() as _,
                 buf.len() as _,
-                &mut bytes_read,
+                bytes_read_uninit.as_mut_ptr(),
             ) != 0;
 
-            if successful && bytes_read as usize == buf.len() {
+            let bytes_read = bytes_read_uninit.assume_init();
+            if successful && bytes_read == buf.len() {
                 Ok(())
             } else {
                 Err(Error::ReadMemory)
