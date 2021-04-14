@@ -1,0 +1,12 @@
+[package]
+name = "mockls"
+version = "0.1.0"
+authors = ["Ted Wollman <25165500+TheTedder@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+livesplit-auto-splitting = { path = "../livesplit-auto-splitting" }
+simple-log = "1.0.1"
+bstr = "0.2.12"
