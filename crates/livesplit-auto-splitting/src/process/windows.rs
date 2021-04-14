@@ -55,7 +55,7 @@ impl Iterator for ScannableIter {
         const MBI_SIZE: usize = mem::size_of::<MEMORY_BASIC_INFORMATION>();
         while self.addr < self.max {
             unsafe {
-                let mut mbi_uninit = mem::MaybeUninit::uninit();
+                let mut mbi_uninit = MaybeUninit::uninit();
                 if VirtualQueryEx(
                     self.handle,
                     self.addr as _,
@@ -106,13 +106,13 @@ impl ProcessImpl for Process {
                 return Err(Error::ListProcesses);
             }
 
-            let mut creation_time_unitit = mem::MaybeUninit::uninit();
-            let mut exit_time_uninit = mem::MaybeUninit::uninit();
-            let mut kernel_time_uninit = mem::MaybeUninit::uninit();
-            let mut user_time_uninit = mem::MaybeUninit::uninit();
+            let mut creation_time_unitit = MaybeUninit::uninit();
+            let mut exit_time_uninit = MaybeUninit::uninit();
+            let mut kernel_time_uninit = MaybeUninit::uninit();
+            let mut user_time_uninit = MaybeUninit::uninit();
 
             let mut best_process = None::<(DWORD, u64)>;
-            let mut entry_uninit = mem::MaybeUninit::<PROCESSENTRY32W>::uninit();
+            let mut entry_uninit = MaybeUninit::<PROCESSENTRY32W>::uninit();
             (*entry_uninit.as_mut_ptr()).dwSize = mem::size_of::<PROCESSENTRY32W>() as _;
 
             if Process32FirstW(snapshot, entry_uninit.as_mut_ptr()) != 0 {
@@ -175,7 +175,7 @@ impl ProcessImpl for Process {
 
     fn read_buf(&self, address: Address, buf: &mut [u8]) -> Result<()> {
         unsafe {
-            let mut bytes_read_uninit = mem::MaybeUninit::uninit();
+            let mut bytes_read_uninit = MaybeUninit::uninit();
 
             let successful = ReadProcessMemory(
                 self.handle,
@@ -228,7 +228,7 @@ impl Process {
 
                 // TODO: processes can dynamically load and unload processes...
                 let mut modules = HashMap::new();
-                let mut entry_uninit = mem::MaybeUninit::<MODULEENTRY32W>::uninit();
+                let mut entry_uninit = MaybeUninit::<MODULEENTRY32W>::uninit();
                 (*entry_uninit.as_mut_ptr()).dwSize = mem::size_of::<MODULEENTRY32W>() as _;
 
                 if Module32FirstW(snapshot, entry_uninit.as_mut_ptr()) != 0 {
