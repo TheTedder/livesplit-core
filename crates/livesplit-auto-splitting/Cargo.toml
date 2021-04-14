@@ -11,22 +11,22 @@ log = "0.4.8"
 num-traits = "0.2.11"
 num-derive = "0.3.0"
 snafu = "0.6.6"
-wasmtime = { version = "0.25.0", default-features = false }
-wasmtime-wasi = { version = "0.25.0", default-features = false }
-wasi-common = { version = "0.25.0", default-features = false }
+wasmtime = { version = "0.26.0", default-features = false }
+wasmtime-wasi = { version = "0.26.0", default-features = false }
+wasi-common = { version = "0.26.0", default-features = false }
 bytemuck = "1.2.0"
-wasi-cap-std-sync = { version = "0.25.0", default-features = false }
+wasi-cap-std-sync = { version = "0.26.0", default-features = false }
 slotmap = "1.0.2"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.5", features = [
-  "handleapi",
-  "memoryapi",
-  "processthreadsapi",
-  "psapi",
-  "tlhelp32",
-  "winnt",
-  "wow64apiset",
+    "handleapi",
+    "memoryapi",
+    "processthreadsapi",
+    "psapi",
+    "tlhelp32",
+    "winnt",
+    "wow64apiset",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
