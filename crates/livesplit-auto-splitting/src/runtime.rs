@@ -9,21 +9,6 @@ use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
 use wasmtime_wasi::Wasi;
 
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TimerState {
-    NotRunning = 0,
-    Running = 1,
-    Finished = 2,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TimerAction {
-    Start,
-    Split,
-    Reset,
-}
-
 // TODO: Check if there's any memory leaks due to reference cycles. The
 // exports keep the instance alive which keeps the imports alive, which all
 // keep the environment alive, which keeps the memory alive, which may keep the
