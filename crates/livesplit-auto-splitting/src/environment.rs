@@ -67,9 +67,14 @@ impl<T: Timer> Environment<T> {
         self.timer.reset()
     }
 
+    pub fn timer_state(&self) -> i32 {
+        self.timer.timer_state() as i32
+    }
+
     pub fn attach(&mut self, ptr: i32, len: i32) -> Result<i64, Trap> {
         let process_name = read_str(&mut self.memory, ptr, len)?;
         let key = if let Ok(p) = Process::with_name(process_name) {
+            println!("Attached to a new process: {}", process_name);
             self.processes.insert(p)
         } else {
             ProcessKey::null()
@@ -164,10 +169,23 @@ impl<T: Timer> Environment<T> {
         Ok(())
     }
 
-    pub fn set_game_time(&mut self, secs: i64, nanos: i64) -> Result<(), Trap> {
+    pub fn set_game_time(&mut self, secs: i64, nanos: i32) -> Result<(), Trap> {
+        // TODO: Trap properly on nanos being larger than one second.
         self.timer
             .set_game_time(Duration::new(secs as u64, nanos as u32));
         Ok(())
+    }
+
+    pub fn pause_game_time(&mut self) {
+        self.timer.pause_game_time()
+    }
+
+    pub fn resume_game_time(&mut self) {
+        self.timer.resume_game_time()
+    }
+
+    pub fn is_game_time_paused(&self) -> i32 {
+        self.timer.is_game_time_paused() as i32
     }
 
     // pub fn update_values(&mut self, just_connected: bool) -> anyhow::Result<()> {

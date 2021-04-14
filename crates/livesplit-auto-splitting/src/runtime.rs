@@ -17,7 +17,6 @@ pub struct Runtime<T> {
     instance: Instance,
     is_configured: bool,
     env: Rc<RefCell<Environment<T>>>,
-    timer_state: TimerState,
     update: Option<TypedFunc<(), ()>>,
     is_loading_val: Option<bool>,
 }
@@ -69,6 +68,11 @@ impl<T: Timer> Runtime<T> {
         //     move |ptr, len| env.borrow_mut().scan_signature(ptr, len)
         // })?;
 
+        linker.func("env", "set_tick_rate", {
+            let env = env.clone();
+            move |ticks_per_sec| env.borrow_mut().set_tick_rate(ticks_per_sec)
+        })?;
+
         linker.func("env", "print_message", {
             let env = env.clone();
             move |ptr, len| env.borrow_mut().print_message(ptr, len)
@@ -85,6 +89,26 @@ impl<T: Timer> Runtime<T> {
         linker.func("env", "set_game_time", {
             let env = env.clone();
             move |secs, nanos| env.borrow_mut().set_game_time(secs, nanos)
+        })?;
+
+        linker.func("env", "pause_game_time", {
+            let env = env.clone();
+            move || env.borrow_mut().pause_game_time()
+        })?;
+
+        linker.func("env", "resume_game_time", {
+            let env = env.clone();
+            move || env.borrow_mut().resume_game_time()
+        })?;
+
+        linker.func("env", "is_game_time_paused", {
+            let env = env.clone();
+            move || env.borrow().is_game_time_paused()
+        })?;
+
+        linker.func("env", "get_timer_state", {
+            let env = env.clone();
+            move || env.borrow().timer_state()
         })?;
 
         let wasi_ctx = WasiCtxBuilder::new()
@@ -167,10 +191,6 @@ impl<T: Timer> Runtime<T> {
         self.run_script()
     }
 
-    pub fn set_state(&mut self, state: TimerState) {
-        self.timer_state = state;
-    }
-
     fn run_script(&mut self) -> anyhow::Result<()> {
         if let Some(update) = &self.update {
             update.call(())?;
@@ -213,6 +233,19 @@ impl<T: Timer> Runtime<T> {
         // }
 
         Ok(())
+    }
+
+    pub fn sleep(&self) {
+        let env = self.env.borrow();
+        let duration = // if env.process.is_some() {
+            env.tick_rate;
+        // } else {
+        //     Duration::from_secs(1)
+        // };
+
+        // FIXME: What if this is insanely long?
+        // FIXME: We may neeed to consider that running the update itself takes time.
+        thread::sleep(duration);
     }
 
     pub fn is_loading(&self) -> Option<bool> {
