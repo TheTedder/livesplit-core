@@ -1,11 +1,7 @@
-use crate::{
-    pointer::{PointerType, PointerValue},
-    process::{Offset, Process},
-    timer::Timer,
-};
-use num_traits::FromPrimitive;
-use slotmap::{DefaultKey, Key, KeyData, SlotMap};
-use std::{collections::HashMap, convert::TryFrom, error::Error, mem, str, time::Duration};
+use crate::{process::Process, timer::Timer};
+
+use slotmap::{Key, KeyData, SlotMap};
+use std::{collections::HashMap, error::Error, str, time::Duration};
 use wasmtime::{Memory, Trap};
 
 slotmap::new_key_type! {
@@ -18,13 +14,6 @@ pub struct Environment<T> {
     // pub process: Option<Process>,
     pub variable_changes: HashMap<String, String>,
     timer: T,
-}
-
-struct PointerPath {
-    module_name: String,
-    offsets: Vec<i64>,
-    current: PointerValue,
-    old: PointerValue,
 }
 
 impl<T: Timer> Environment<T> {

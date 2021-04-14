@@ -1,5 +1,4 @@
 mod environment;
-mod pointer;
 mod process;
 mod runtime;
 mod std_stream;
