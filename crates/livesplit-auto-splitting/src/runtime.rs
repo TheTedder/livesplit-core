@@ -4,7 +4,7 @@ use crate::{
     timer::Timer,
     InterruptHandle,
 };
-use std::{cell::RefCell, mem, rc::Rc};
+use std::{cell::RefCell, mem, rc::Rc, thread};
 use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
 use wasmtime_wasi::Wasi;
@@ -130,7 +130,6 @@ impl<T: Timer> Runtime<T> {
             instance,
             is_configured: false,
             env,
-            timer_state: TimerState::NotRunning,
             update,
             is_loading_val: None,
         })
