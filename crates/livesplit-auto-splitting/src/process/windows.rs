@@ -1,24 +1,29 @@
-use winapi::shared::minwindef::{BOOL, DWORD};
-use winapi::um::{
-    handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
-    memoryapi::{ReadProcessMemory, VirtualQueryEx},
-    processthreadsapi::{GetProcessTimes, OpenProcess},
-    psapi::GetModuleFileNameExW,
-    tlhelp32::{
-        CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, Process32FirstW, Process32NextW,
-        MODULEENTRY32W, PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPPROCESS,
+use winapi::{
+    shared::minwindef::MAX_PATH,
+    um::{
+        handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
+        memoryapi::{ReadProcessMemory, VirtualQueryEx},
+        processthreadsapi::{GetProcessTimes, OpenProcess},
+        tlhelp32::{
+            CreateToolhelp32Snapshot, Module32FirstW, Module32NextW, Process32FirstW,
+            Process32NextW, MODULEENTRY32W, PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPPROCESS,
+        },
+        winnt::{
+            HANDLE, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
+            PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
+        },
     },
-    winnt::{
-        HANDLE, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
-        PROCESS_QUERY_INFORMATION, PROCESS_VM_READ,
-    },
+};
+use winapi::{
+    shared::minwindef::{BOOL, DWORD},
+    um::winbase::QueryFullProcessImageNameW,
 };
 
 use std::ffi::{OsStr, OsString};
+use std::mem;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::{collections::HashMap, mem::MaybeUninit};
-use std::{mem, ptr};
 
 use super::{Address, Error, ProcessImpl, Result, ScannableRange};
 
@@ -198,15 +203,10 @@ impl ProcessImpl for Process {
 impl Process {
     /*pub*/
     fn path(&self) -> Option<PathBuf> {
-        let mut path_buf = [0u16; 1024];
-        if unsafe {
-            GetModuleFileNameExW(
-                self.handle,
-                ptr::null_mut(),
-                path_buf.as_mut_ptr() as *mut _,
-                path_buf.len() as _,
-            )
-        } == 0
+        let mut path_buf = [0u16; MAX_PATH];
+        let mut length = path_buf.len() as u32;
+        if unsafe { QueryFullProcessImageNameW(self.handle, 0, path_buf.as_mut_ptr(), &mut length) }
+            == 0
         {
             return None;
         }
