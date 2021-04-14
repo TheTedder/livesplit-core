@@ -1,5 +1,5 @@
 use bstr::BStr;
-use livesplit_auto_splitting::{Runtime, Timer};
+use livesplit_auto_splitting::{Runtime, Timer, TimerState};
 use log::Log;
 use std::{
     cell::RefCell,
@@ -42,6 +42,18 @@ impl Timer for DummyTimer {
     fn split(&mut self) {}
     fn reset(&mut self) {}
     fn set_game_time(&mut self, _time: Duration) {}
+
+    fn timer_state(&self) -> TimerState {
+        TimerState::NotRunning
+    }
+
+    fn pause_game_time(&mut self) {}
+
+    fn resume_game_time(&mut self) {}
+
+    fn is_game_time_paused(&self) -> bool {
+        false
+    }
 }
 
 fn compile(crate_name: &str) -> anyhow::Result<Runtime<DummyTimer>> {
