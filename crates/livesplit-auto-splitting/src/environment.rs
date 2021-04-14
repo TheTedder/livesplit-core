@@ -11,6 +11,7 @@ slotmap::new_key_type! {
 pub struct Environment<T> {
     pub memory: Option<Memory>,
     processes: SlotMap<ProcessKey, Process>,
+    pub tick_rate: Duration,
     // pub process: Option<Process>,
     pub variable_changes: HashMap<String, String>,
     timer: T,
@@ -22,6 +23,7 @@ impl<T: Timer> Environment<T> {
             memory: None,
             processes: SlotMap::with_key(),
             variable_changes: HashMap::new(),
+            tick_rate: Duration::from_secs(1) / 60,
             timer,
         }
     }
@@ -116,10 +118,10 @@ impl<T: Timer> Environment<T> {
     //     Ok(0)
     // }
 
-    // pub fn set_tick_rate(&mut self, ticks_per_sec: f64) {
-    //     log::info!("New Tick Rate: {}", ticks_per_sec);
-    //     self.tick_rate = Duration::from_secs_f64(1.0 / ticks_per_sec);
-    // }
+    pub fn set_tick_rate(&mut self, ticks_per_sec: f64) {
+        log::info!("New Tick Rate: {}", ticks_per_sec);
+        self.tick_rate = Duration::from_secs_f64(1.0 / ticks_per_sec);
+    }
 
     pub fn print_message(&mut self, ptr: i32, len: i32) -> Result<(), Trap> {
         let message = read_str(&mut self.memory, ptr, len)?;
