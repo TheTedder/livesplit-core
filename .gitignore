@@ -1,8 +1,9 @@
-**.rs.bk
+**/*.rs.bk
 capi/bind_gen/target
 capi/bindings
 capi/Cargo.lock
 capi/target
 Cargo.lock
 docs
-target
+debug/
+target/
