@@ -45,8 +45,8 @@ mod tests {
     #[test]
     fn test() {
         let hook = Hook::new().unwrap();
-        hook.register(KeyCode::Numpad1, || println!("A")).unwrap();
-        println!("Press Numpad1");
+        hook.register(KeyCode::Digit1, || println!("A")).unwrap();
+        println!("Press Digit1");
         thread::sleep(Duration::from_secs(5));
         hook.unregister(KeyCode::Numpad1).unwrap();
         hook.register(KeyCode::KeyN, || println!("B")).unwrap();
@@ -56,7 +56,7 @@ mod tests {
         hook.register(KeyCode::Numpad1, || println!("C")).unwrap();
         println!("Press Numpad1");
         thread::sleep(Duration::from_secs(5));
-        hook.unregister(KeyCode::Numpad1).unwrap();
+        hook.unregister(KeyCode::Digit1).unwrap();
     }
 
     #[test]
@@ -73,6 +73,6 @@ mod tests {
         println!("Enter: {}", KeyCode::Enter.resolve());
         println!("Space: {}", KeyCode::Space.resolve());
         println!("Tab: {}", KeyCode::Tab.resolve());
-        println!("Numpad0: {}", KeyCode::Numpad0.resolve());
+        println!("Digit0: {}", KeyCode::Digit0.resolve());
     }
 }
