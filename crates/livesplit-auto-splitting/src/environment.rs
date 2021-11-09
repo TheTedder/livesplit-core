@@ -1,7 +1,10 @@
-use crate::{process::Process, timer::Timer};
+use crate::timer::Timer;
 
+use log::info;
+use read_process_memory::{CopyAddress, ProcessHandle};
 use slotmap::{Key, KeyData, SlotMap};
-use std::{collections::HashMap, error::Error, str, time::Duration};
+use std::{convert::TryInto, error::Error, str, time::Duration};
+use sysinfo::{self, Pid, ProcessExt, System, SystemExt};
 use wasmtime::{Memory, Trap};
 
 slotmap::new_key_type! {
@@ -10,10 +13,10 @@ slotmap::new_key_type! {
 
 pub struct Environment<T> {
     pub memory: Option<Memory>,
-    processes: SlotMap<ProcessKey, Process>,
+    processes: SlotMap<ProcessKey, Pid>,
     pub tick_rate: Duration,
-    pub variable_changes: HashMap<String, String>,
     timer: T,
+    info: System,
 }
 
 impl<T: Timer> Environment<T> {
@@ -21,9 +24,9 @@ impl<T: Timer> Environment<T> {
         Self {
             memory: None,
             processes: SlotMap::with_key(),
-            variable_changes: HashMap::new(),
             tick_rate: Duration::from_secs(1) / 60,
             timer,
+            info: System::new(),
         }
     }
 }
@@ -72,10 +75,14 @@ impl<T: Timer> Environment<T> {
 
     pub fn attach(&mut self, ptr: i32, len: i32) -> Result<i64, Trap> {
         let process_name = read_str(&mut self.memory, ptr, len)?;
-        let key = if let Ok(p) = Process::with_name(process_name) {
-            println!("Attached to a new process: {}", process_name);
-            self.processes.insert(p)
+        self.info.refresh_processes();
+        let mut processes = self.info.process_by_name(process_name);
+        let key = if let Some(p) = processes.pop() {
+            // TODO: handle the case where we got multiple processes with the same name
+            info!("Attached to a new process: {}", process_name);
+            self.processes.insert(p.pid())
         } else {
+            info!("Couldn't find process: {}", process_name);
             ProcessKey::null()
         };
         Ok(key.data().as_ffi() as i64)
@@ -92,13 +99,13 @@ impl<T: Timer> Environment<T> {
     }
 
     pub fn set_tick_rate(&mut self, ticks_per_sec: f64) {
-        log::info!("New Tick Rate: {}", ticks_per_sec);
+        info!("New Tick Rate: {}", ticks_per_sec);
         self.tick_rate = Duration::from_secs_f64(ticks_per_sec.recip());
     }
 
     pub fn print_message(&mut self, ptr: i32, len: i32) -> Result<(), Trap> {
         let message = read_str(&mut self.memory, ptr, len)?;
-        log::info!(target: "Auto Splitter", "{}", message);
+        info!(target: "Auto Splitter", "{}", message);
         Ok(())
     }
 
@@ -116,8 +123,10 @@ impl<T: Timer> Environment<T> {
             .get(key)
             .ok_or_else(|| Trap::new(format!("Invalid process handle {}.", process)))?;
 
-        let res = process.read_buf(
-            address as u64,
+        // TODO: is unwrapping fine here?
+        let pid: ProcessHandle = (*process).try_into().unwrap();
+        let res = pid.copy_address(
+            address as usize,
             get_bytes(&mut self.memory, buf_ptr, buf_len)?,
         );
 
@@ -133,7 +142,7 @@ impl<T: Timer> Environment<T> {
     ) -> Result<(), Trap> {
         let key = read_str(&mut self.memory, key_ptr, key_len)?.to_owned();
         let value = read_str(&mut self.memory, value_ptr, value_len)?.to_owned();
-        self.variable_changes.insert(key, value);
+        self.timer.set_variable(&key, &value);
         Ok(())
     }
 
@@ -153,9 +162,5 @@ impl<T: Timer> Environment<T> {
 
     pub fn resume_game_time(&mut self) {
         self.timer.resume_game_time()
-    }
-
-    pub fn is_game_time_paused(&self) -> i32 {
-        self.timer.is_game_time_paused() as i32
     }
 }

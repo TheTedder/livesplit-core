@@ -5,7 +5,8 @@ use std::time::Duration;
 pub enum TimerState {
     NotRunning = 0,
     Running = 1,
-    Finished = 2,
+    Paused = 2,
+    Finished = 3,
 }
 
 pub trait Timer: 'static {
@@ -13,10 +14,8 @@ pub trait Timer: 'static {
     fn start(&mut self);
     fn split(&mut self);
     fn reset(&mut self);
-    //fn get_game_time(&self) -> Duration;
     fn set_game_time(&mut self, time: Duration);
     fn pause_game_time(&mut self);
     fn resume_game_time(&mut self);
-    fn is_game_time_paused(&self) -> bool;
-    // fn set_variable(&mut self, key: &str, value: &str);
+    fn set_variable(&mut self, key: &str, value: &str);
 }

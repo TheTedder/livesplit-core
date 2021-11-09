@@ -150,8 +150,10 @@ struct AST(SharedTimer);
 impl AutoSplitTimer for AST {
     fn timer_state(&self) -> TimerState {
         match self.0.read().current_phase() {
+            // TODO: transmute
             TimerPhase::NotRunning => TimerState::NotRunning,
-            TimerPhase::Running | TimerPhase::Paused => TimerState::Running,
+            TimerPhase::Running => TimerState::Running,
+            TimerPhase::Paused => TimerState::Paused,
             TimerPhase::Ended => TimerState::Finished,
         }
     }
@@ -184,7 +186,7 @@ impl AutoSplitTimer for AST {
         self.0.write().resume_game_time()
     }
 
-    fn is_game_time_paused(&self) -> bool {
-        self.0.read().is_game_time_paused()
+    fn set_variable(&mut self, key: &str, value: &str) {
+        self.0.write().set_custom_variable(key, value);
     }
 }

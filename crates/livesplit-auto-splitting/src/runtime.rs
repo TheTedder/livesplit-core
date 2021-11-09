@@ -4,7 +4,7 @@ use crate::{
     timer::Timer,
     InterruptHandle,
 };
-use std::{cell::RefCell, mem, rc::Rc, thread, time::Instant};
+use std::{cell::RefCell, rc::Rc, thread, time::Instant};
 use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
 use wasmtime_wasi::Wasi;
@@ -18,7 +18,6 @@ pub struct Runtime<T> {
     is_configured: bool,
     env: Rc<RefCell<Environment<T>>>,
     update: Option<TypedFunc<(), ()>>,
-    is_loading_val: Option<bool>,
     prev_time: Instant,
 }
 
@@ -97,11 +96,6 @@ impl<T: Timer> Runtime<T> {
             move || env.borrow_mut().resume_game_time()
         })?;
 
-        linker.func("env", "is_game_time_paused", {
-            let env = env.clone();
-            move || env.borrow().is_game_time_paused()
-        })?;
-
         linker.func("env", "get_timer_state", {
             let env = env.clone();
             move || env.borrow().timer_state()
@@ -127,7 +121,6 @@ impl<T: Timer> Runtime<T> {
             is_configured: false,
             env,
             update,
-            is_loading_val: None,
             prev_time: Instant::now(),
         })
     }
@@ -206,14 +199,5 @@ impl<T: Timer> Runtime<T> {
             thread::sleep(target - delta);
         }
         self.prev_time = Instant::now();
-    }
-
-    pub fn is_loading(&self) -> Option<bool> {
-        self.is_loading_val
-    }
-
-    pub fn drain_variable_changes(&mut self) -> impl Iterator<Item = (String, String)> {
-        // TODO: This is kind of stupid. We lose all the capacity this way.
-        mem::take(&mut self.env.borrow_mut().variable_changes).into_iter()
     }
 }
