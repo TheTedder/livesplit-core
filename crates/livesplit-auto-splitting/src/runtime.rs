@@ -4,7 +4,7 @@ use crate::{
     timer::Timer,
     InterruptHandle,
 };
-use std::{cell::RefCell, mem, rc::Rc, thread};
+use std::{cell::RefCell, mem, rc::Rc, thread, time::Instant};
 use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
 use wasmtime_wasi::Wasi;
@@ -19,6 +19,7 @@ pub struct Runtime<T> {
     env: Rc<RefCell<Environment<T>>>,
     update: Option<TypedFunc<(), ()>>,
     is_loading_val: Option<bool>,
+    prev_time: Instant,
 }
 
 impl<T: Timer> Runtime<T> {
@@ -62,11 +63,6 @@ impl<T: Timer> Runtime<T> {
                     .read_into_buf(process, address, buf_ptr, buf_len)
             }
         })?;
-
-        // linker.func("env", "scan_signature", {
-        //     let env = env.clone();
-        //     move |ptr, len| env.borrow_mut().scan_signature(ptr, len)
-        // })?;
 
         linker.func("env", "set_tick_rate", {
             let env = env.clone();
@@ -132,6 +128,7 @@ impl<T: Timer> Runtime<T> {
             env,
             update,
             is_loading_val: None,
+            prev_time: Instant::now(),
         })
     }
 
@@ -144,49 +141,17 @@ impl<T: Timer> Runtime<T> {
 
     pub fn step(&mut self) -> anyhow::Result<()> {
         if !self.is_configured {
-            // TODO: _start is kind of correct, but not in the long term. They are
-            // intending for us to use a different function for libraries. Look into
-            // reactors.
+            // TODO: _start is kind of correct, but not in the long term
+            // See: https://github.com/WebAssembly/WASI/issues/24
             if let Ok(func) = self.instance.get_typed_func("_start") {
                 func.call(())?;
             }
-
             // TODO: Do we error out if this doesn't exist?
             if let Ok(func) = self.instance.get_typed_func("configure") {
                 func.call(())?;
             }
             self.is_configured = true;
         }
-
-        // {
-        //     let mut just_connected = false;
-
-        //     let mut env = self.env.borrow_mut();
-        //     if env.process.is_none() {
-        //         env.process = match Process::with_name(&env.process_name) {
-        //             Ok(p) => Some(p),
-        //             Err(_) => return Ok(None),
-        //         };
-        //         log::info!(target: "Auto Splitter", "Hooked");
-        //         just_connected = true;
-        //     }
-        //     if env.update_values(just_connected).is_err() {
-        //         log::info!(target: "Auto Splitter", "Unhooked");
-        //         env.process = None;
-        //         if !just_connected {
-        //             if let Some(unhooked) = &self.unhooked {
-        //                 unhooked.call(())?;
-        //             }
-        //         }
-        //         return Ok(None);
-        //     }
-        //     if just_connected {
-        //         if let Some(hooked) = &self.hooked {
-        //             hooked.call(())?;
-        //         }
-        //     }
-        // }
-
         self.run_script()
     }
 
@@ -234,17 +199,13 @@ impl<T: Timer> Runtime<T> {
         Ok(())
     }
 
-    pub fn sleep(&self) {
-        let env = self.env.borrow();
-        let duration = // if env.process.is_some() {
-            env.tick_rate;
-        // } else {
-        //     Duration::from_secs(1)
-        // };
-
-        // FIXME: What if this is insanely long?
-        // FIXME: We may neeed to consider that running the update itself takes time.
-        thread::sleep(duration);
+    pub fn sleep(&mut self) {
+        let target = self.env.borrow().tick_rate;
+        let delta = self.prev_time.elapsed();
+        if delta < target {
+            thread::sleep(target - delta);
+        }
+        self.prev_time = Instant::now();
     }
 
     pub fn is_loading(&self) -> Option<bool> {

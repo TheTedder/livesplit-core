@@ -12,7 +12,6 @@ pub struct Environment<T> {
     pub memory: Option<Memory>,
     processes: SlotMap<ProcessKey, Process>,
     pub tick_rate: Duration,
-    // pub process: Option<Process>,
     pub variable_changes: HashMap<String, String>,
     timer: T,
 }
@@ -92,40 +91,9 @@ impl<T: Timer> Environment<T> {
         Ok(())
     }
 
-    // pub fn get_val<T>(
-    //     &self,
-    //     pointer_path_id: i32,
-    //     current: i32,
-    //     convert: impl FnOnce(&PointerValue) -> Option<T>,
-    // ) -> Result<T, Trap> {
-    //     let pointer_path = self
-    //         .pointer_paths
-    //         .get(pointer_path_id as u32 as usize)
-    //         .ok_or_else(|| Trap::new("Specified invalid pointer path"))?;
-
-    //     let value = if current != 0 {
-    //         &pointer_path.current
-    //     } else {
-    //         &pointer_path.old
-    //     };
-
-    //     convert(value).ok_or_else(|| Trap::new("The types did not match"))
-    // }
-
-    // pub fn scan_signature(&mut self, ptr: i32, len: i32) -> Result<i64, Trap> {
-    //     // TODO: Don't trap
-    //     if let Some(process) = &self.process {
-    //         let signature = read_str(&mut self.memory, ptr, len)?;
-    //         let address = process.scan_signature(signature).map_err(trap_from_err)?;
-    //         return Ok(address.unwrap_or(0) as i64);
-    //     }
-
-    //     Ok(0)
-    // }
-
     pub fn set_tick_rate(&mut self, ticks_per_sec: f64) {
         log::info!("New Tick Rate: {}", ticks_per_sec);
-        self.tick_rate = Duration::from_secs_f64(1.0 / ticks_per_sec);
+        self.tick_rate = Duration::from_secs_f64(ticks_per_sec.recip());
     }
 
     pub fn print_message(&mut self, ptr: i32, len: i32) -> Result<(), Trap> {
@@ -170,10 +138,13 @@ impl<T: Timer> Environment<T> {
     }
 
     pub fn set_game_time(&mut self, secs: i64, nanos: i32) -> Result<(), Trap> {
-        // TODO: Trap properly on nanos being larger than one second.
-        self.timer
-            .set_game_time(Duration::new(secs as u64, nanos as u32));
-        Ok(())
+        if nanos >= 1_000_000_000 {
+            Err(Trap::new("more than a one second of nanoseconds"))
+        } else {
+            self.timer
+                .set_game_time(Duration::new(secs as u64, nanos as u32));
+            Ok(())
+        }
     }
 
     pub fn pause_game_time(&mut self) {
@@ -187,60 +158,4 @@ impl<T: Timer> Environment<T> {
     pub fn is_game_time_paused(&self) -> i32 {
         self.timer.is_game_time_paused() as i32
     }
-
-    // pub fn update_values(&mut self, just_connected: bool) -> anyhow::Result<()> {
-    //     let process = self
-    //         .process
-    //         .as_mut()
-    //         .expect("The process should be connected at this point");
-
-    //     for pointer_path in &mut self.pointer_paths {
-    //         let mut address = if !pointer_path.module_name.is_empty() {
-    //             process.module_address(&pointer_path.module_name)?
-    //         } else {
-    //             0
-    //         };
-    //         let mut offsets = pointer_path.offsets.iter().cloned().peekable();
-    //         if process.is_64bit() {
-    //             while let Some(offset) = offsets.next() {
-    //                 address = (address as Offset).wrapping_add(offset) as u64;
-    //                 if offsets.peek().is_some() {
-    //                     address = process.read(address)?;
-    //                 }
-    //             }
-    //         } else {
-    //             while let Some(offset) = offsets.next() {
-    //                 address = (address as i32).wrapping_add(offset as i32) as u64;
-    //                 if offsets.peek().is_some() {
-    //                     address = process.read::<u32>(address)? as u64;
-    //                 }
-    //             }
-    //         }
-    //         match &mut pointer_path.old {
-    //             PointerValue::U8(v) => *v = process.read(address)?,
-    //             PointerValue::U16(v) => *v = process.read(address)?,
-    //             PointerValue::U32(v) => *v = process.read(address)?,
-    //             PointerValue::U64(v) => *v = process.read(address)?,
-    //             PointerValue::I8(v) => *v = process.read(address)?,
-    //             PointerValue::I16(v) => *v = process.read(address)?,
-    //             PointerValue::I32(v) => *v = process.read(address)?,
-    //             PointerValue::I64(v) => *v = process.read(address)?,
-    //             PointerValue::F32(v) => *v = process.read(address)?,
-    //             PointerValue::F64(v) => *v = process.read(address)?,
-    //             PointerValue::String(_) => todo!(),
-    //         }
-    //     }
-
-    //     if just_connected {
-    //         for pointer_path in &mut self.pointer_paths {
-    //             pointer_path.current.clone_from(&pointer_path.old);
-    //         }
-    //     } else {
-    //         for pointer_path in &mut self.pointer_paths {
-    //             mem::swap(&mut pointer_path.current, &mut pointer_path.old);
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
 }
