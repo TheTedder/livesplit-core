@@ -13,8 +13,8 @@ slotmap::new_key_type! {
 
 pub struct Environment<T> {
     pub memory: Option<Memory>,
-    processes: SlotMap<ProcessKey, Pid>,
     pub tick_rate: Duration,
+    processes: SlotMap<ProcessKey, Pid>,
     timer: T,
     info: System,
 }
@@ -35,7 +35,7 @@ fn trap_from_err(e: impl Error + Send + Sync + 'static) -> Trap {
     Trap::new(anyhow::Error::from(e).to_string())
 }
 
-fn get_bytes(memory: &mut Option<Memory>, ptr: i32, len: i32) -> Result<&mut [u8], Trap> {
+fn get_bytes(memory: &mut Option<Memory>, ptr: u32, len: u32) -> Result<&mut [u8], Trap> {
     let memory = unsafe {
         memory
             .as_mut()
@@ -51,7 +51,7 @@ fn get_bytes(memory: &mut Option<Memory>, ptr: i32, len: i32) -> Result<&mut [u8
         .ok_or_else(|| Trap::new("Index out of bounds"))
 }
 
-fn read_str(memory: &mut Option<Memory>, ptr: i32, len: i32) -> Result<&str, Trap> {
+fn read_str(memory: &mut Option<Memory>, ptr: u32, len: u32) -> Result<&str, Trap> {
     let bytes = get_bytes(memory, ptr, len)?;
     str::from_utf8(bytes).map_err(trap_from_err)
 }
@@ -69,11 +69,11 @@ impl<T: Timer> Environment<T> {
         self.timer.reset()
     }
 
-    pub fn timer_state(&self) -> i32 {
-        self.timer.timer_state() as i32
+    pub fn timer_state(&self) -> u32 {
+        self.timer.timer_state() as u32
     }
 
-    pub fn attach(&mut self, ptr: i32, len: i32) -> Result<i64, Trap> {
+    pub fn attach(&mut self, ptr: u32, len: u32) -> Result<u64, Trap> {
         let process_name = read_str(&mut self.memory, ptr, len)?;
         self.info.refresh_processes();
         let mut processes = self.info.process_by_name(process_name);
@@ -85,10 +85,10 @@ impl<T: Timer> Environment<T> {
             info!("Couldn't find process: {}", process_name);
             ProcessKey::null()
         };
-        Ok(key.data().as_ffi() as i64)
+        Ok(key.data().as_ffi())
     }
 
-    pub fn detach(&mut self, process: i64) -> Result<(), Trap> {
+    pub fn detach(&mut self, process: u64) -> Result<(), Trap> {
         let key = ProcessKey::from(KeyData::from_ffi(process as u64));
 
         self.processes
@@ -103,7 +103,7 @@ impl<T: Timer> Environment<T> {
         self.tick_rate = Duration::from_secs_f64(ticks_per_sec.recip());
     }
 
-    pub fn print_message(&mut self, ptr: i32, len: i32) -> Result<(), Trap> {
+    pub fn print_message(&mut self, ptr: u32, len: u32) -> Result<(), Trap> {
         let message = read_str(&mut self.memory, ptr, len)?;
         info!(target: "Auto Splitter", "{}", message);
         Ok(())
@@ -111,11 +111,11 @@ impl<T: Timer> Environment<T> {
 
     pub fn read_into_buf(
         &mut self,
-        process: i64,
-        address: i64,
-        buf_ptr: i32,
-        buf_len: i32,
-    ) -> Result<i32, Trap> {
+        process: u64,
+        address: u64,
+        buf_ptr: u32,
+        buf_len: u32,
+    ) -> Result<u32, Trap> {
         let key = ProcessKey::from(KeyData::from_ffi(process as u64));
 
         let process = self
@@ -130,15 +130,15 @@ impl<T: Timer> Environment<T> {
             get_bytes(&mut self.memory, buf_ptr, buf_len)?,
         );
 
-        Ok(res.is_ok() as i32)
+        Ok(res.is_ok() as u32)
     }
 
     pub fn set_variable(
         &mut self,
-        key_ptr: i32,
-        key_len: i32,
-        value_ptr: i32,
-        value_len: i32,
+        key_ptr: u32,
+        key_len: u32,
+        value_ptr: u32,
+        value_len: u32,
     ) -> Result<(), Trap> {
         let key = read_str(&mut self.memory, key_ptr, key_len)?.to_owned();
         let value = read_str(&mut self.memory, value_ptr, value_len)?.to_owned();
@@ -146,12 +146,11 @@ impl<T: Timer> Environment<T> {
         Ok(())
     }
 
-    pub fn set_game_time(&mut self, secs: i64, nanos: i32) -> Result<(), Trap> {
+    pub fn set_game_time(&mut self, secs: u64, nanos: u32) -> Result<(), Trap> {
         if nanos >= 1_000_000_000 {
             Err(Trap::new("more than a one second of nanoseconds"))
         } else {
-            self.timer
-                .set_game_time(Duration::new(secs as u64, nanos as u32));
+            self.timer.set_game_time(Duration::new(secs, nanos));
             Ok(())
         }
     }

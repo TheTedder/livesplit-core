@@ -1,13 +1,10 @@
 use crate::{
     environment::Environment,
-    std_stream::{stderr, stdout},
     timer::Timer,
     InterruptHandle,
 };
 use std::{cell::RefCell, rc::Rc, thread, time::Instant};
-use wasi_cap_std_sync::WasiCtxBuilder;
 use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
-use wasmtime_wasi::Wasi;
 
 // TODO: Check if there's any memory leaks due to reference cycles. The
 // exports keep the instance alive which keeps the imports alive, which all
@@ -100,16 +97,6 @@ impl<T: Timer> Runtime<T> {
             let env = env.clone();
             move || env.borrow().timer_state()
         })?;
-
-        let wasi_ctx = WasiCtxBuilder::new()
-            .stdout(Box::new(stdout()))
-            .stderr(Box::new(stderr()))
-            .build()
-            .unwrap();
-
-        Wasi::new(&store, wasi_ctx)
-            .add_to_linker(&mut linker)
-            .unwrap();
 
         let instance = linker.instantiate(&module)?;
         env.borrow_mut().memory = instance.exports().find_map(Export::into_memory);

@@ -1,6 +1,5 @@
 mod environment;
 mod runtime;
-mod std_stream;
 mod timer;
 
 pub use runtime::Runtime;
