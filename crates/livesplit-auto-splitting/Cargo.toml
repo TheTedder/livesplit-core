@@ -5,7 +5,7 @@ authors = ["Christopher Serr <christopher.serr@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.28"
+anyhow = "1.0.45"
 log = "0.4.14"
 slotmap = "1.0.6"
 sysinfo = "0.20.5"
