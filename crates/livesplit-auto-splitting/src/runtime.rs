@@ -42,7 +42,7 @@ impl<T: Timer> Runtime<T> {
                 info: System::new(),
             },
         );
-        let module = Module::from_binary(&engine, binary)?;
+        let module = Module::new(&engine, binary)?;
 
         let mut linker = Linker::new(&engine);
 
