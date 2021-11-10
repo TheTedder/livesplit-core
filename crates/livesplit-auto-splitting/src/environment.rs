@@ -4,7 +4,7 @@ use log::info;
 use read_process_memory::{CopyAddress, ProcessHandle};
 use slotmap::{Key, KeyData, SlotMap};
 use std::{convert::TryInto, error::Error, str, time::Duration};
-use sysinfo::{self, Pid, ProcessExt, System, SystemExt};
+use sysinfo::{self, Pid, ProcessExt, System, SystemExt, AsU32};
 use wasmtime::{Memory, Trap};
 
 slotmap::new_key_type! {
@@ -123,8 +123,7 @@ impl<T: Timer> Environment<T> {
             .get(key)
             .ok_or_else(|| Trap::new(format!("Invalid process handle {}.", process)))?;
 
-        // TODO: is unwrapping fine here?
-        let pid: ProcessHandle = (*process).try_into().unwrap();
+        let pid: ProcessHandle = process.as_u32().try_into().map_err(|_| Trap::new(format!("invalid PID: {}", process)))?;
         let res = pid.copy_address(
             address as usize,
             get_bytes(&mut self.memory, buf_ptr, buf_len)?,
