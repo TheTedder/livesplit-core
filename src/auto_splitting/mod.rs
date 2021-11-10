@@ -202,8 +202,4 @@ impl AutoSplitTimer for AST {
     fn resume_game_time(&mut self) {
         self.0.write().resume_game_time()
     }
-
-    fn set_variable(&mut self, key: &str, value: &str) {
-        self.0.write().set_custom_variable(key, value);
-    }
 }

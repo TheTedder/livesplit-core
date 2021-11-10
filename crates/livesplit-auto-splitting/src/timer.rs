@@ -17,5 +17,4 @@ pub trait Timer: 'static {
     fn set_game_time(&mut self, time: Duration);
     fn pause_game_time(&mut self);
     fn resume_game_time(&mut self);
-    fn set_variable(&mut self, key: &str, value: &str);
 }
