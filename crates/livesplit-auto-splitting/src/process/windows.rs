@@ -185,8 +185,7 @@ impl ProcessImpl for Process {
                 bytes_read_uninit.as_mut_ptr(),
             ) != 0;
 
-            let bytes_read = bytes_read_uninit.assume_init();
-            if successful && bytes_read == buf.len() {
+            if successful && bytes_read_uninit.assume_init() == buf.len() {
                 Ok(())
             } else {
                 Err(Error::ReadMemory)
