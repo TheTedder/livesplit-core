@@ -5,55 +5,16 @@ use read_process_memory::{CopyAddress, ProcessHandle};
 use slotmap::{Key, KeyData, SlotMap};
 use std::{convert::TryInto, error::Error, str, time::Duration};
 use sysinfo::{self, Pid, ProcessExt, System, SystemExt, AsU32};
-use wasmtime::{Memory, Trap};
+use wasmtime::{Memory, Store, Trap};
 
-slotmap::new_key_type! {
-    struct ProcessKey;
-}
-
-pub struct Environment<T> {
-    pub memory: Option<Memory>,
-    pub tick_rate: Duration,
-    processes: SlotMap<ProcessKey, Pid>,
-    timer: T,
-    info: System,
-}
-
-impl<T: Timer> Environment<T> {
-    pub fn new(timer: T) -> Self {
-        Self {
-            memory: None,
-            processes: SlotMap::with_key(),
-            tick_rate: Duration::from_secs(1) / 60,
-            timer,
-            info: System::new(),
-        }
-    }
-}
 
 fn trap_from_err(e: impl Error + Send + Sync + 'static) -> Trap {
     Trap::new(anyhow::Error::from(e).to_string())
 }
 
-fn get_bytes(memory: &mut Option<Memory>, ptr: u32, len: u32) -> Result<&mut [u8], Trap> {
-    let memory = unsafe {
-        memory
-            .as_mut()
-            .ok_or_else(|| Trap::new("There is no memory to use"))?
-            .data_unchecked_mut()
-    };
+impl<T> Environment<T> {
 
-    let ptr = ptr as u32 as usize;
-    let len = len as u32 as usize;
 
-    memory
-        .get_mut(ptr..ptr + len)
-        .ok_or_else(|| Trap::new("Index out of bounds"))
-}
-
-fn read_str(memory: &mut Option<Memory>, ptr: u32, len: u32) -> Result<&str, Trap> {
-    let bytes = get_bytes(memory, ptr, len)?;
-    str::from_utf8(bytes).map_err(trap_from_err)
 }
 
 impl<T: Timer> Environment<T> {
@@ -130,19 +91,6 @@ impl<T: Timer> Environment<T> {
         );
 
         Ok(res.is_ok() as u32)
-    }
-
-    pub fn set_variable(
-        &mut self,
-        key_ptr: u32,
-        key_len: u32,
-        value_ptr: u32,
-        value_len: u32,
-    ) -> Result<(), Trap> {
-        let key = read_str(&mut self.memory, key_ptr, key_len)?.to_owned();
-        let value = read_str(&mut self.memory, value_ptr, value_len)?.to_owned();
-        self.timer.set_variable(&key, &value);
-        Ok(())
     }
 
     pub fn set_game_time(&mut self, secs: u64, nanos: u32) -> Result<(), Trap> {

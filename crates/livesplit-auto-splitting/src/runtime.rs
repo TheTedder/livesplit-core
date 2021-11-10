@@ -1,19 +1,30 @@
 use crate::{
-    environment::Environment,
     timer::Timer,
     InterruptHandle,
 };
-use std::{cell::RefCell, rc::Rc, thread, time::Instant};
-use wasmtime::{Config, Engine, Export, Instance, Linker, Module, Store, TypedFunc};
+use std::{borrow::BorrowMut, cell::RefCell, rc::Rc, thread, time::{Duration, Instant}};
+use read_process_memory::ProcessHandle;
+use slotmap::{KeyData, SlotMap};
+use sysinfo::{System, SystemExt};
+use anyhow::anyhow;
+use wasmtime::{Config, Engine, Export, Instance, Linker, Memory, Module, Store, Trap, TypedFunc};
 
-// TODO: Check if there's any memory leaks due to reference cycles. The
-// exports keep the instance alive which keeps the imports alive, which all
-// keep the environment alive, which keeps the memory alive, which may keep the
-// instance alive -> reference cycle.
-pub struct Runtime<T> {
+slotmap::new_key_type! {
+    struct ProcessKey;
+}
+
+pub struct Context<T: Timer> {
+    pub tick_rate: Duration,
+    pub processes: SlotMap<ProcessKey, ProcessHandle>,
+    pub timer: T,
+    pub info: System
+}
+
+pub struct Runtime<T: Timer> {
     instance: Instance,
+    store: Store<Context<T>>,
+    memory: Memory,
     is_configured: bool,
-    env: Rc<RefCell<Environment<T>>>,
     update: Option<TypedFunc<(), ()>>,
     prev_time: Instant,
 }
@@ -21,38 +32,43 @@ pub struct Runtime<T> {
 impl<T: Timer> Runtime<T> {
     pub fn new(binary: &[u8], timer: T) -> anyhow::Result<Self> {
         let engine = Engine::new(Config::new().interruptable(true))?;
-        let store = Store::new(&engine);
+        let store = Store::new(&engine, Context{
+            tick_rate: Duration::from_secs_f64( 1.0 / 120.0),
+            processes: SlotMap::with_key(),
+            timer,
+            info: System::new(),
+        });
         let module = Module::from_binary(&engine, binary)?;
         let env = Rc::new(RefCell::new(Environment::new(timer)));
 
-        let mut linker = Linker::new(&store);
+        let mut linker = Linker::new(&engine);
 
-        linker.func("env", "start", {
+        linker.func_wrap("env", "start", {
             let env = env.clone();
             move || env.borrow_mut().start()
         })?;
 
-        linker.func("env", "split", {
+        linker.func_wrap("env", "split", {
             let env = env.clone();
             move || env.borrow_mut().split()
         })?;
 
-        linker.func("env", "reset", {
+        linker.func_wrap("env", "reset", {
             let env = env.clone();
             move || env.borrow_mut().reset()
         })?;
 
-        linker.func("env", "attach", {
+        linker.func_wrap("env", "attach", {
             let env = env.clone();
             move |ptr, len| env.borrow_mut().attach(ptr, len)
         })?;
 
-        linker.func("env", "detach", {
+        linker.func_wrap("env", "detach", {
             let env = env.clone();
             move |process| env.borrow_mut().detach(process)
         })?;
 
-        linker.func("env", "read_into_buf", {
+        linker.func_wrap("env", "read_into_buf", {
             let env = env.clone();
             move |process, address, buf_ptr, buf_len| {
                 env.borrow_mut()
@@ -60,75 +76,101 @@ impl<T: Timer> Runtime<T> {
             }
         })?;
 
-        linker.func("env", "set_tick_rate", {
+        linker.func_wrap("env", "set_tick_rate", {
             let env = env.clone();
             move |ticks_per_sec| env.borrow_mut().set_tick_rate(ticks_per_sec)
         })?;
 
-        linker.func("env", "print_message", {
+        linker.func_wrap("env", "print_message", {
             let env = env.clone();
             move |ptr, len| env.borrow_mut().print_message(ptr, len)
         })?;
 
-        linker.func("env", "set_variable", {
-            let env = env.clone();
-            move |key_ptr, key_len, value_ptr, value_len| {
-                env.borrow_mut()
-                    .set_variable(key_ptr, key_len, value_ptr, value_len)
-            }
-        })?;
-
-        linker.func("env", "set_game_time", {
+        linker.func_wrap("env", "set_game_time", {
             let env = env.clone();
             move |secs, nanos| env.borrow_mut().set_game_time(secs, nanos)
         })?;
 
-        linker.func("env", "pause_game_time", {
+        linker.func_wrap("env", "pause_game_time", {
             let env = env.clone();
             move || env.borrow_mut().pause_game_time()
         })?;
 
-        linker.func("env", "resume_game_time", {
+        linker.func_wrap("env", "resume_game_time", {
             let env = env.clone();
             move || env.borrow_mut().resume_game_time()
         })?;
 
-        linker.func("env", "get_timer_state", {
+        linker.func_wrap("env", "get_timer_state", {
             let env = env.clone();
             move || env.borrow().timer_state()
         })?;
 
-        let instance = linker.instantiate(&module)?;
-        env.borrow_mut().memory = instance.exports().find_map(Export::into_memory);
-
-        let update = instance.get_typed_func("update").ok();
+        let instance = linker.instantiate(&mut store, &module)?;
+        let memory = instance.exports(&mut store).find_map(Export::into_memory).ok_or(anyhow!("There is no memory to use"))?;
+        let update = instance.get_typed_func(&mut store, "update").ok();
 
         Ok(Self {
             instance,
+            store,
             is_configured: false,
-            env,
+            memory,
             update,
             prev_time: Instant::now(),
         })
     }
 
+    pub fn fill_buf(
+        &mut self,
+        process: u64,
+        address: u64,
+        buf_ptr: u32,
+        buf_len: u32,
+    ) -> Result<u32, Trap> {
+        let key = ProcessKey::from(KeyData::from_ffi(process as u64));
+
+        let memory = self.memory.data_mut(&mut self.store);
+
+        let ptr = buf_ptr as usize;
+        let len = buf_len as usize;
+
+
+        let process = self
+            .processes
+            .get(key)
+            .ok_or_else(|| Trap::new(format!("Invalid process handle {}.", process)))?;
+
+        let pid: ProcessHandle = process.as_u32().try_into().map_err(|_| Trap::new(format!("invalid PID: {}", process)))?;
+        let res = pid.copy_address(
+            address as usize,
+        memory.get_mut(ptr..ptr + len)
+    .ok_or_else(|| Trap::new("Index out of bounds"))
+        );
+
+        Ok(res.is_ok() as u32)
+    }
+
+    fn get_slice(&self, ptr: u32, len: u32) -> Result<&[u8], Trap> {
+        let memory = self.
+    }
+    
+    fn read_str(&mut self, ptr: u32, len: u32) -> Result<&str, Trap> {
+        let bytes = self.get_slice(memory, ptr, len)?;
+        str::from_utf8(bytes).map_err(trap_from_err)
+    }
+    
     pub fn interrupt_handle(&self) -> InterruptHandle {
-        self.instance
-            .store()
+        self.store
             .interrupt_handle()
             .expect("We configured the runtime to produce an interrupt handle")
     }
 
     pub fn step(&mut self) -> anyhow::Result<()> {
         if !self.is_configured {
-            // TODO: _start is kind of correct, but not in the long term
-            // See: https://github.com/WebAssembly/WASI/issues/24
-            if let Ok(func) = self.instance.get_typed_func("_start") {
-                func.call(())?;
-            }
-            // TODO: Do we error out if this doesn't exist?
             if let Ok(func) = self.instance.get_typed_func("configure") {
-                func.call(())?;
+                func.call(&mut self.store, ())?;
+            } else {
+                return Err(anyhow!("didn't expose a 'configure' function"));
             }
             self.is_configured = true;
         }
@@ -137,50 +179,13 @@ impl<T: Timer> Runtime<T> {
 
     fn run_script(&mut self) -> anyhow::Result<()> {
         if let Some(update) = &self.update {
-            update.call(())?;
+            update.call(&mut self.store, ())?;
         }
-
-        // match self.timer_state {
-        //     TimerState::NotRunning => {
-        //         if let Some(should_start) = &self.should_start {
-        //             if should_start.call(())? != 0 {
-        //                 return Ok(Some(TimerAction::Start));
-        //             }
-        //         }
-        //     }
-        //     TimerState::Running => {
-        //         if let Some(is_loading) = &self.is_loading {
-        //             self.is_loading_val = Some(is_loading.call(())? != 0);
-        //         }
-        //         if let Some(game_time) = &self.game_time {
-        //             self.game_time_val = Some(game_time.call(())?).filter(|v| !v.is_nan());
-        //         }
-
-        //         if let Some(should_split) = &self.should_split {
-        //             if should_split.call(())? != 0 {
-        //                 return Ok(Some(TimerAction::Split));
-        //             }
-        //         }
-        //         if let Some(should_reset) = &self.should_reset {
-        //             if should_reset.call(())? != 0 {
-        //                 return Ok(Some(TimerAction::Reset));
-        //             }
-        //         }
-        //     }
-        //     TimerState::Finished => {
-        //         if let Some(should_reset) = &self.should_reset {
-        //             if should_reset.call(())? != 0 {
-        //                 return Ok(Some(TimerAction::Reset));
-        //             }
-        //         }
-        //     }
-        // }
-
         Ok(())
     }
 
     pub fn sleep(&mut self) {
-        let target = self.env.borrow().tick_rate;
+        let target = self.store.data().tick_rate;
         let delta = self.prev_time.elapsed();
         if delta < target {
             thread::sleep(target - delta);
