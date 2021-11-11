@@ -1,4 +1,3 @@
-use bstr::BStr;
 use livesplit_auto_splitting::{Runtime, Timer, TimerState};
 use log::Log;
 use std::{
@@ -50,10 +49,6 @@ impl Timer for DummyTimer {
     fn pause_game_time(&mut self) {}
 
     fn resume_game_time(&mut self) {}
-
-    fn is_game_time_paused(&self) -> bool {
-        false
-    }
 }
 
 fn compile(crate_name: &str) -> anyhow::Result<Runtime<DummyTimer>> {
@@ -68,11 +63,10 @@ fn compile(crate_name: &str) -> anyhow::Result<Runtime<DummyTimer>> {
         .arg("wasm32-wasi")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .output()
-        .unwrap();
+        .output()?;
 
     if !output.status.success() {
-        let output: &BStr = output.stderr.as_slice().into();
+        let output = std::str::from_utf8(output.stderr.as_slice())?;
         panic!("{}", output);
     }
 
