@@ -9,6 +9,7 @@ edition = "2018"
 [workspace]
 
 [dependencies]
+aslib = { path = "../../../../aslib" }
 
 [lib]
 crate-type = ["cdylib"]
