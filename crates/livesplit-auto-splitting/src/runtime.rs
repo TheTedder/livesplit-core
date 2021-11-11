@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use log::info;
 use read_process_memory::{CopyAddress, ProcessHandle};
 use slotmap::{Key, KeyData, SlotMap};
-use std::{convert::TryInto, error::Error, thread, time::{Duration, Instant}};
+use std::{convert::TryInto, error::Error, panic::catch_unwind, thread, time::{Duration, Instant}};
 use sysinfo::{AsU32, ProcessExt, System, SystemExt};
 use wasmtime::{Caller, Config, Engine, Extern, Instance, Linker, Module, Store, Trap, TypedFunc};
 
@@ -128,8 +128,13 @@ impl<T: Timer> Runtime<T> {
             Ok(())
         })?;
 
-        linker.func_wrap("env", "set_game_time", |mut caller: Caller<'_, Context<T>>, secs: u64, nanos: u32| {
-            caller.data_mut().timer.set_game_time(Duration::new(secs, nanos));
+        linker.func_wrap("env", "set_game_time", |mut caller: Caller<'_, Context<T>>, secs: f64| -> Result<(), Trap> {
+            let dur: Duration = catch_unwind(|| {
+                Duration::from_secs_f64(secs)
+            }).or(Err(Trap::new(format!("Could not instantiate a Duration with the following float value: {}", secs))))?;
+
+            caller.data_mut().timer.set_game_time(dur);
+            Ok(())
         })?;
 
         linker.func_wrap("env", "pause_game_time", |mut caller: Caller<'_, Context<T>> | {
