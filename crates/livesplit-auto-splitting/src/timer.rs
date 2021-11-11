@@ -1,4 +1,4 @@
-use std::time::Duration;
+use time::Duration;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
