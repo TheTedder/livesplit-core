@@ -92,6 +92,14 @@ pub fn reset() {
     unsafe { sys::reset() }
 }
 
+pub fn set_tick_rate(ticks_per_second: f64) {
+    unsafe { sys::set_tick_rate(ticks_per_second) }
+}
+
+pub fn print_message(msg: &str) {
+    unsafe { sys::print_message(msg.as_ptr(), msg.len()) }
+}
+
 pub fn set_game_time(secs: f64) {
     unsafe { sys::set_game_time(secs)}
 }
