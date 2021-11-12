@@ -5,7 +5,7 @@ use core::{
 };
 
 mod sys {
-    use super::{Address, Process};
+    use super::Address;
 
     pub const INVALID_PROCESS_HANDLE: i64 = 0x1_FFFF_FFFF;
 
@@ -101,7 +101,7 @@ pub fn print_message(msg: &str) {
 }
 
 pub fn set_game_time(secs: f64) {
-    unsafe { sys::set_game_time(secs)}
+    unsafe { sys::set_game_time(secs) }
 }
 
 pub fn pause_game_time() {
