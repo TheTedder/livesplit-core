@@ -13,3 +13,6 @@ aslib = { path = "../../../../aslib" }
 
 [lib]
 crate-type = ["cdylib"]
+
+[profile.test]
+panic = "abort"
