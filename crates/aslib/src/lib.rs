@@ -1,3 +1,5 @@
+#![no_std]
+
 mod asl;
 
 pub use self::asl::*;
