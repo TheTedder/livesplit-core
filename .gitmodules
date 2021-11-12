@@ -1,3 +1,0 @@
-[submodule "crates/mockls/autosplitter"]
-	path = crates/mockls/autosplitter
-	url = https://github.com/TheTedder/autosplitter-test.git
