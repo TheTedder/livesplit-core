@@ -92,16 +92,6 @@ fn empty() {
 }
 
 #[test]
-fn proc_exit() {
-    assert!(run("proc-exit").is_err());
-}
-
-#[test]
-fn create_file() {
-    run("create-file").unwrap();
-}
-
-#[test]
 fn stdout() {
     let _ = log::set_logger(&LOGGER);
     log::set_max_level(log::LevelFilter::Trace);
@@ -110,50 +100,13 @@ fn stdout() {
     let output = BUF.with(|b| b.borrow_mut().take());
     assert_eq!(
         output.unwrap(),
-        "Printing from the auto splitter\nError printing from the auto splitter\n",
+        "Printing from the auto splitter\n",
     );
 }
 
 #[test]
 fn segfault() {
     assert!(run("segfault").is_err());
-}
-
-#[test]
-fn env() {
-    run("env").unwrap();
-    assert!(std::env::var("AUTOSPLITTER_HOST_SHOULDNT_SEE_THIS").is_err());
-}
-
-#[test]
-fn threads() {
-    // There's no threads in WASI / WASM yet, so this is expected to trap.
-    assert!(run("threads").is_err());
-}
-
-#[test]
-fn sleep() {
-    // TODO: Sleeping can basically deadlock the code. We should have a limit on
-    // how long it can sleep.
-    run("sleep").unwrap();
-}
-
-#[test]
-fn time() {
-    run("time").unwrap();
-}
-
-#[test]
-fn random() {
-    run("random").unwrap();
-}
-
-#[test]
-fn poll() {
-    // TODO: This is basically what happens at the lower levels of sleeping. You
-    // can block on file descriptors and have a timeout with this. Both of which
-    // could deadlock the script.
-    run("poll").unwrap();
 }
 
 #[test]
