@@ -21,18 +21,19 @@
 //!    pub fn get_timer_state() -> u32;
 //! }
 //! ```
+
+use time::Duration;
 // (TODO: link to an example autosplitter and/or a helper crate for writing
 // them)
 
 use {
-    crate::{timing::SharedTimer, TimeSpan},
+    crate::{timing::SharedTimer},
     crossbeam_channel::{bounded, unbounded, Sender},
     livesplit_auto_splitting::{
         Runtime as ScriptRuntime, Timer as AutoSplitTimer, TimerState,
     },
     std::{
         thread::{self, JoinHandle},
-        time::Duration,
     },
 };
 
@@ -192,7 +193,7 @@ impl AutoSplitTimer for AST {
         // self.0.write().set_game_time(time.into());
         self.0
             .write()
-            .set_game_time(TimeSpan::from_milliseconds(time.as_millis() as f64));
+            .set_game_time(time.into());
     }
 
     fn pause_game_time(&mut self) {

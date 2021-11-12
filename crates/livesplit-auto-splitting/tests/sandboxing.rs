@@ -1,15 +1,7 @@
 use livesplit_auto_splitting::{Runtime, Timer, TimerState};
 use log::Log;
-use std::{
-    cell::RefCell,
-    ffi::OsStr,
-    fmt::Write,
-    fs,
-    path::PathBuf,
-    process::{Command, Stdio},
-    thread,
-    time::Duration,
-};
+use time::Duration;
+use std::{cell::RefCell, ffi::OsStr, fmt::Write, fs, path::PathBuf, process::{Command, Stdio}, thread};
 
 thread_local! {
     static BUF: RefCell<Option<String>> = RefCell::new(None);
@@ -171,11 +163,9 @@ fn infinite_loop() {
     let interrupt = runtime.interrupt_handle();
 
     thread::spawn(move || {
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(std::time::Duration::from_secs(5));
         interrupt.interrupt();
     });
 
     assert!(runtime.step().is_err());
 }
-
-// TODO: Test heavy amounts of allocations

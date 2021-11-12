@@ -3,7 +3,8 @@ use anyhow::anyhow;
 use log::info;
 use read_process_memory::{CopyAddress, ProcessHandle};
 use slotmap::{Key, KeyData, SlotMap};
-use std::{convert::TryInto, error::Error, panic::catch_unwind, thread, time::{Duration, Instant}};
+use time::{Duration};
+use std::{convert::TryInto, error::Error, panic::catch_unwind, thread};
 use sysinfo::{AsU32, ProcessExt, System, SystemExt};
 use wasmtime::{Caller, Config, Engine, Extern, Instance, Linker, Module, Store, Trap, TypedFunc};
 
@@ -16,7 +17,7 @@ fn trap_from_err(e: impl Error + Send + Sync + 'static) -> Trap {
 }
 
 pub struct Context<T: Timer> {
-    tick_rate: Duration,
+    tick_rate: std::time::Duration,
     processes: SlotMap<ProcessKey, ProcessHandle>,
     timer: T,
     info: System,
@@ -27,8 +28,11 @@ pub struct Runtime<T: Timer> {
     store: Store<Context<T>>,
     is_configured: bool,
     update: Option<TypedFunc<(), ()>>,
-    prev_time: Instant,
+    prev_time: std::time::Instant,
 }
+
+//rougly 1/120 seconds
+const DEFAULT_TICK_RATE: std::time::Duration = std::time::Duration::from_nanos(8_333_333);
 
 impl<T: Timer> Runtime<T> {
     pub fn new(binary: &[u8], timer: T) -> anyhow::Result<Self> {
@@ -36,7 +40,7 @@ impl<T: Timer> Runtime<T> {
         let mut store = Store::new(
             &engine,
             Context {
-                tick_rate: Duration::from_secs_f64(1.0 / 120.0),
+                tick_rate: DEFAULT_TICK_RATE,
                 processes: SlotMap::with_key(),
                 timer,
                 info: System::new(),
@@ -117,10 +121,22 @@ impl<T: Timer> Runtime<T> {
             ).map_err(trap_from_err)
         })?;
 
-        linker.func_wrap("env", "set_tick_rate", |mut caller: Caller<'_, Context<T>>, ticks_per_sec: f64| {
-            caller.data_mut().tick_rate = Duration::from_secs_f64(ticks_per_sec.recip())
-        })?;
+        linker.func_wrap("env", "set_tick_rate", |mut caller: Caller<'_, Context<T>>, ticks_per_sec: f64| -> Result<(), Trap> {
+            let secs_per_tick = ticks_per_sec.recip();
 
+            if secs_per_tick >= 0.0 && secs_per_tick.is_finite() {
+                
+                let new_tickrate = catch_unwind(|| {
+                    std::time::Duration::from_secs_f64(secs_per_tick)
+                }).or(Err(Trap::new(format!("Could not instantiate an std::time::Duration with the following float value: {}", secs_per_tick))))?;
+                
+                caller.data_mut().tick_rate = new_tickrate;
+                Ok(())
+            } else {                
+                Err(Trap::new(format!("The tick rate specified does not correspond to a positive finite interval: {}", ticks_per_sec)))
+            }
+        })?;
+        
         linker.func_wrap("env", "print_message", |mut caller: Caller<'_, Context<T>>, ptr: u32, len: u32| -> Result<(), Trap> {
             let mem = Self::get_memory(&mut caller)?;
             let message = Self::read_str(mem, ptr, len)?;
@@ -129,12 +145,16 @@ impl<T: Timer> Runtime<T> {
         })?;
 
         linker.func_wrap("env", "set_game_time", |mut caller: Caller<'_, Context<T>>, secs: f64| -> Result<(), Trap> {
-            let dur: Duration = catch_unwind(|| {
-                Duration::from_secs_f64(secs)
-            }).or(Err(Trap::new(format!("Could not instantiate a Duration with the following float value: {}", secs))))?;
-
-            caller.data_mut().timer.set_game_time(dur);
-            Ok(())
+            if secs.is_finite() {
+                let dur: Duration = catch_unwind(|| {
+                    Duration::seconds_f64(secs)
+                }).or(Err(Trap::new(format!("Could not instantiate a Duration with the following float value: {}", secs))))?;
+                
+                caller.data_mut().timer.set_game_time(dur);
+                Ok(())
+            } else {
+                Err(Trap::new(format!("The time specified is not finite {}", secs)))
+            }
         })?;
 
         linker.func_wrap("env", "pause_game_time", |mut caller: Caller<'_, Context<T>> | {
@@ -157,7 +177,7 @@ impl<T: Timer> Runtime<T> {
             store,
             is_configured: false,
             update,
-            prev_time: Instant::now(),
+            prev_time: std::time::Instant::now(),
         })
     }
    
@@ -208,11 +228,10 @@ impl<T: Timer> Runtime<T> {
     }
 
     pub fn sleep(&mut self) {
-        let target = self.store.data().tick_rate;
-        let delta = self.prev_time.elapsed();
-        if delta < target {
-            thread::sleep(target - delta);
+        let duration = self.store.data().tick_rate - self.prev_time.elapsed();
+        if duration > Duration::ZERO {
+            thread::sleep(duration.try_into().unwrap());
         }
-        self.prev_time = Instant::now();
+        self.prev_time = std::time::Instant::now();
     }
 }
